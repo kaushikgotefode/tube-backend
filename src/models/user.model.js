@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import ApiError from "../utils/ApiError.js";
 const { ObjectId } = mongoose.Schema.Types;
 
 const userSchema = new Schema(
@@ -69,13 +70,13 @@ userSchema.pre("save", async function (next) {
     next();
 });
 userSchema.methods.generateAuthToken = function () {
-    const token = jwt.sign({ id: this._id, email: this.email, fullName:this.fullName }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ _id: this._id, email: this.email, fullName: this.fullName }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRATION,
     });
     return token;
 };
 userSchema.methods.generateRefreshToken = function () {
-    const refreshToken = jwt.sign({id: this._id}, process.env.JWT_REFRESH_SECRET, {
+    const refreshToken = jwt.sign({ _id: this._id }, process.env.JWT_REFRESH_SECRET, {
         expiresIn: process.env.JWT_REFRESH_EXPIRATION,
     });
     this.refreshToken = refreshToken;
@@ -85,6 +86,7 @@ userSchema.methods.generateRefreshToken = function () {
 userSchema.methods.comparePassword = async function (password) {
     return await bcrypt.compare(password, this.password);
 };
+
 userSchema.methods.toJSON = function () {
     const user = this;
     const userObject = user.toObject();
@@ -92,14 +94,15 @@ userSchema.methods.toJSON = function () {
     delete userObject.refreshToken;
     return userObject;
 };
-userSchema.statics.findByCredentials = async function (email, password) {
-    const user = await this.findOne({ email });
+
+userSchema.statics.findByCredentials = async function (username, email, password) {
+    const user = await this.findOne({ $or: [{ username }, { email }] });
     if (!user) {
-        throw new Error("Invalid credentials");
+        throw new ApiError(404, "User does not exist.");
     }
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-        throw new Error("Invalid credentials");
+        throw new ApiError(404, "Invalid user credentials");
     }
     return user;
 };
