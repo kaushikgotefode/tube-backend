@@ -135,4 +135,32 @@ const refreshActionToken = asyncHandler(async (req, res) => {
     }
 });
 
-export { registerUser, loginUser, logoutUser, refreshActionToken };
+const updatePassword = asyncHandler(async (req, res) => {
+    const { password, newPassword, confirmPassword } = req.body;
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+        throw new ApiError(400, "Password mismatch");
+    }
+    const user = await User.findById(req.user?._id);
+
+    if (!user) {
+        throw new ApiError(404, "Unauthorized request");
+    }
+
+    const comparePassword = await user.comparePassword(password);
+
+    if (!comparePassword) {
+        throw new ApiError(400, "Current password incurrect");
+    }
+
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json(new ApiResponce(200, {}, "Password updated successfully"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    res.status(200).json(new ApiResponce(200, req.user, "Success"));
+});
+
+export { registerUser, loginUser, logoutUser, refreshActionToken, updatePassword, getCurrentUser };
